@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Scientific Calculator</title>
+  <meta name="description" content="A modern, minimalist scientific calculator with expression parsing, trigonometry, logarithms, history and light or dark themes." />
+  <meta name="theme-color" content="#050506" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="color-scheme" content="dark light" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Scientific Calculator" />
+  <meta property="og:description" content="A modern, minimalist scientific calculator with expression parsing, trigonometry, logarithms and history." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    (function () {
+      const saved = localStorage.getItem("theme");
+      document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+    })();
+  </script>
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <button class="control control-history" id="historyToggle" type="button" aria-label="History">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4.5l3 1.8" />
+    </svg>
+  </button>
+
+  <button class="control control-theme" id="themeToggle" type="button" aria-label="Toggle theme">
+    <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12H5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8" />
+    </svg>
+    <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+    </svg>
+  </button>
+
+  <aside class="history" id="historyPanel" aria-label="Calculation history">
+    <header class="history-head">
+      <span class="history-title">History</span>
+      <button class="history-clear" id="historyClear" type="button">Clear</button>
+    </header>
+    <ul class="history-list" id="historyList"></ul>
+    <p class="history-empty" id="historyEmpty">No calculations yet</p>
+  </aside>
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+  <main class="calculator" role="application" aria-label="Scientific calculator">
+    <section class="display">
+      <div class="display-secondary" id="secondary" aria-live="polite"></div>
+      <div class="display-primary" id="primary" role="button" tabindex="-1" aria-label="Result, tap to copy">0</div>
+    </section>
+
+    <div class="keys">
+      <div class="keys-grid keys-scientific">
+        <button class="key key-tool" data-action="second" id="secondKey">2nd</button>
+        <button class="key key-tool" data-action="angle" id="angleKey">DEG</button>
+        <button class="key key-fn" data-type="op" data-value="(">(</button>
+        <button class="key key-fn" data-type="op" data-value=")">)</button>
+
+        <button class="key key-fn"
+          data-type="fn"
+          data-value1="sin(" data-label1="sin"
+          data-value2="asin(" data-label2="sin⁻¹"
+          data-value="sin(">sin</button>
+        <button class="key key-fn"
+          data-type="fn"
+          data-value1="cos(" data-label1="cos"
+          data-value2="acos(" data-label2="cos⁻¹"
+          data-value="cos(">cos</button>
+        <button class="key key-fn"
+          data-type="fn"
+          data-value1="tan(" data-label1="tan"
+          data-value2="atan(" data-label2="tan⁻¹"
+          data-value="tan(">tan</button>
+        <button class="key key-fn" data-type="const" data-value="π">π</button>
+
+        <button class="key key-fn"
+          data-type="fn"
+          data-value1="ln(" data-label1="ln"
+          data-value2="e^(" data-label2="eˣ"
+          data-value="ln(">ln</button>
+        <button class="key key-fn"
+          data-type="fn"
+          data-value1="log(" data-label1="log"
+          data-value2="10^(" data-label2="10ˣ"
+          data-value="log(">log</button>
+        <button class="key key-fn"
+          data-type="fn"
+          data-value1="√(" data-label1="√"
+          data-value2="∛(" data-label2="∛"
+          data-value="√(">√</button>
+        <button class="key key-fn" data-type="const" data-value="e">e</button>
+
+        <button class="key key-fn"
+          data-type="postfix"
+          data-value1="²" data-label1="x²"
+          data-value2="³" data-label2="x³"
+          data-value="²">x²</button>
+        <button class="key key-fn" data-type="op" data-value="^">xʸ</button>
+        <button class="key key-fn" data-type="postfix" data-value="⁻¹">x⁻¹</button>
+        <button class="key key-fn" data-type="postfix" data-value="!">x!</button>
+      </div>
+
+      <div class="keys-grid keys-main">
+        <button class="key key-tool" data-action="clear">AC</button>
+        <button class="key key-tool" data-action="delete" aria-label="Delete">DEL</button>
+        <button class="key key-tool" data-type="postfix" data-value="%">%</button>
+        <button class="key key-operator" data-type="op" data-value="÷">÷</button>
+
+        <button class="key key-number" data-type="digit" data-value="7">7</button>
+        <button class="key key-number" data-type="digit" data-value="8">8</button>
+        <button class="key key-number" data-type="digit" data-value="9">9</button>
+        <button class="key key-operator" data-type="op" data-value="×">×</button>
+
+        <button class="key key-number" data-type="digit" data-value="4">4</button>
+        <button class="key key-number" data-type="digit" data-value="5">5</button>
+        <button class="key key-number" data-type="digit" data-value="6">6</button>
+        <button class="key key-operator" data-type="op" data-value="−">−</button>
+
+        <button class="key key-number" data-type="digit" data-value="1">1</button>
+        <button class="key key-number" data-type="digit" data-value="2">2</button>
+        <button class="key key-number" data-type="digit" data-value="3">3</button>
+        <button class="key key-operator" data-type="op" data-value="+">+</button>
+
+        <button class="key key-tool" data-action="sign" aria-label="Toggle sign">±</button>
+        <button class="key key-number" data-type="digit" data-value="0">0</button>
+        <button class="key key-number" data-type="digit" data-value=".">.</button>
+        <button class="key key-equals" data-action="equals">=</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Copied</div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

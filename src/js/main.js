@@ -1,4 +1,7 @@
 const primaryEl = document.getElementById("primary");
+const primaryWrap = document.getElementById("primaryWrap");
+const displayMeta = document.getElementById("displayMeta");
+const metaCount = document.getElementById("metaCount");
 const secondaryEl = document.getElementById("secondary");
 const secondKey = document.getElementById("secondKey");
 const angleKey = document.getElementById("angleKey");
@@ -29,17 +32,46 @@ const multiCharTokens = [
 const precedence = { "+": 2, "-": 2, "*": 3, "/": 3, "u": 4, "^": 5 };
 const rightAssociative = { "^": true, "u": true };
 
+const PRECISION = 100;
+const DISPLAY_DIGITS = 40;
+const ZERO_SNAP = "1e-90";
+const FACTORIAL_LIMIT = 5000;
+const MAX_POWER_DIGITS = 20000;
+
+Decimal.set({ precision: PRECISION });
+
+let cachedPi = null;
+let cachedE = null;
+
+function pi() {
+  if (!cachedPi) cachedPi = Decimal.acos(-1);
+  return cachedPi;
+}
+
+function eulers() {
+  if (!cachedE) cachedE = new Decimal(1).exp();
+  return cachedE;
+}
+
+function isInteger(value) {
+  return typeof value === "bigint";
+}
+
+function toDecimal(value) {
+  return isInteger(value) ? new Decimal(value.toString()) : value;
+}
+
 const functions = {
-  sin: (x, deg) => Math.sin(deg ? toRadians(x) : x),
-  cos: (x, deg) => Math.cos(deg ? toRadians(x) : x),
-  tan: (x, deg) => Math.tan(deg ? toRadians(x) : x),
-  asin: (x, deg) => (deg ? toDegrees(Math.asin(x)) : Math.asin(x)),
-  acos: (x, deg) => (deg ? toDegrees(Math.acos(x)) : Math.acos(x)),
-  atan: (x, deg) => (deg ? toDegrees(Math.atan(x)) : Math.atan(x)),
-  ln: (x) => Math.log(x),
-  log: (x) => Math.log10(x),
-  sqrt: (x) => Math.sqrt(x),
-  cbrt: (x) => Math.cbrt(x)
+  sin: (x, deg) => (deg ? toRadians(x) : x).sin(),
+  cos: (x, deg) => (deg ? toRadians(x) : x).cos(),
+  tan: (x, deg) => (deg ? toRadians(x) : x).tan(),
+  asin: (x, deg) => (deg ? toDegrees(x.asin()) : x.asin()),
+  acos: (x, deg) => (deg ? toDegrees(x.acos()) : x.acos()),
+  atan: (x, deg) => (deg ? toDegrees(x.atan()) : x.atan()),
+  ln: (x) => x.ln(),
+  log: (x) => x.log(10),
+  sqrt: (x) => x.sqrt(),
+  cbrt: (x) => x.cbrt()
 };
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -49,15 +81,16 @@ let historyData = loadHistory();
 let toastTimer = null;
 
 function toRadians(value) {
-  return (value * Math.PI) / 180;
+  return value.times(pi()).div(180);
 }
 
 function toDegrees(value) {
-  return (value * 180) / Math.PI;
+  return value.times(180).div(pi());
 }
 
 function normalize(expression) {
   return expression
+    .replace(/,/g, "")
     .replace(/×/g, "*")
     .replace(/÷/g, "/")
     .replace(/−/g, "-")
@@ -85,7 +118,8 @@ function tokenize(input) {
         number += input[i];
         i += 1;
       }
-      tokens.push({ type: "number", value: parseFloat(number) });
+      const value = /^[0-9]+$/.test(number) ? BigInt(number) : new Decimal(number);
+      tokens.push({ type: "number", value });
       continue;
     }
     if (/[a-z]/i.test(char)) {
@@ -94,8 +128,8 @@ function tokenize(input) {
         name += input[i];
         i += 1;
       }
-      if (name === "pi") tokens.push({ type: "number", value: Math.PI });
-      else if (name === "e") tokens.push({ type: "number", value: Math.E });
+      if (name === "pi") tokens.push({ type: "number", value: pi() });
+      else if (name === "e") tokens.push({ type: "number", value: eulers() });
       else tokens.push({ type: "function", value: name });
       continue;
     }
@@ -184,9 +218,12 @@ function toReversePolish(tokens) {
 }
 
 function factorial(value) {
-  if (value < 0 || !Number.isInteger(value)) throw new Error("Invalid factorial");
-  let result = 1;
-  for (let i = 2; i <= value; i += 1) result *= i;
+  if (!isInteger(value) && !value.isInteger()) throw new Error("Invalid factorial");
+  const n = isInteger(value) ? value : BigInt(value.toFixed());
+  if (n < 0n) throw new Error("Invalid factorial");
+  if (n > BigInt(FACTORIAL_LIMIT)) throw new Error("Out of range");
+  let result = 1n;
+  for (let i = 2n; i <= n; i += 1n) result *= i;
   return result;
 }
 
@@ -197,7 +234,8 @@ function evaluateRpn(output, degrees) {
       stack.push(token.value);
     } else if (token.type === "operator") {
       if (token.value === "u") {
-        stack.push(-stack.pop());
+        const operand = stack.pop();
+        stack.push(isInteger(operand) ? -operand : operand.neg());
         continue;
       }
       const b = stack.pop();
@@ -209,7 +247,7 @@ function evaluateRpn(output, degrees) {
       if (!handler) throw new Error("Unknown function");
       const x = stack.pop();
       if (x === undefined) throw new Error("Invalid expression");
-      stack.push(handler(x, degrees));
+      stack.push(handler(toDecimal(x), degrees));
     } else if (token.type === "postfix") {
       const x = stack.pop();
       if (x === undefined) throw new Error("Invalid expression");
@@ -220,19 +258,47 @@ function evaluateRpn(output, degrees) {
   return stack[0];
 }
 
+function integerPower(base, exponent) {
+  if (base === 0n || base === 1n || base === -1n) return base ** exponent;
+  const digits = base.toString().replace("-", "").length * Number(exponent);
+  if (digits > MAX_POWER_DIGITS) throw new Error("Out of range");
+  return base ** exponent;
+}
+
 function applyOperator(operator, a, b) {
+  if (isInteger(a) && isInteger(b)) {
+    switch (operator) {
+      case "+":
+        return a + b;
+      case "-":
+        return a - b;
+      case "*":
+        return a * b;
+      case "/":
+        if (b === 0n) throw new Error("Division by zero");
+        return a % b === 0n ? a / b : toDecimal(a).div(toDecimal(b));
+      case "^":
+        if (b >= 0n) return integerPower(a, b);
+        break;
+      default:
+        throw new Error("Unknown operator");
+    }
+  }
+
+  const x = toDecimal(a);
+  const y = toDecimal(b);
   switch (operator) {
     case "+":
-      return a + b;
+      return x.plus(y);
     case "-":
-      return a - b;
+      return x.minus(y);
     case "*":
-      return a * b;
+      return x.times(y);
     case "/":
-      if (b === 0) throw new Error("Division by zero");
-      return a / b;
+      if (y.isZero()) throw new Error("Division by zero");
+      return x.div(y);
     case "^":
-      return Math.pow(a, b);
+      return x.pow(y);
     default:
       throw new Error("Unknown operator");
   }
@@ -241,53 +307,98 @@ function applyOperator(operator, a, b) {
 function evaluate(expression) {
   if (!expression.trim()) throw new Error("Empty expression");
   const result = evaluateRpn(toReversePolish(tokenize(normalize(expression))), state.degrees);
-  if (!Number.isFinite(result)) throw new Error("Out of range");
+  if (!isInteger(result) && (result.isNaN() || !result.isFinite())) throw new Error("Out of range");
   return result;
 }
 
+function groupDigits(text) {
+  const negative = text.startsWith("-");
+  const unsigned = negative ? text.slice(1) : text;
+  const [integer, decimal] = unsigned.split(".");
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const body = decimal ? `${grouped}.${decimal}` : grouped;
+  return negative ? `-${body}` : body;
+}
+
 function formatNumber(value) {
-  let rounded = Math.round((value + Number.EPSILON) * 1e10) / 1e10;
-  if (Object.is(rounded, -0)) rounded = 0;
-  const magnitude = Math.abs(rounded);
-  if (magnitude !== 0 && (magnitude >= 1e12 || magnitude < 1e-9)) {
-    return rounded.toExponential(6).replace(/\.?0+e/, "e");
+  if (isInteger(value)) return value === 0n ? "0" : groupDigits(value.toString());
+  if (value.isZero() || value.abs().lt(ZERO_SNAP)) return "0";
+  if (value.isInteger()) return groupDigits(value.toFixed());
+  const display = value.toSignificantDigits(DISPLAY_DIGITS);
+  const magnitude = display.abs();
+  if (magnitude.gte("1e21") || magnitude.lt("1e-9")) {
+    return display.toExponential().replace(/e\+?/, "e");
   }
-  const [integer, decimal] = String(rounded).split(".");
-  const formattedInteger = Number(integer).toLocaleString("en-US");
-  return decimal ? `${formattedInteger}.${decimal}` : formattedInteger;
+  return groupDigits(display.toFixed());
 }
 
 function hasOperation(expression) {
   return /[+\-×÷^!²³⁻√∛%(]/.test(expression) || /(sin|cos|tan|ln|log)/.test(expression);
 }
 
+let previewCache = { key: "", value: null };
+
 function preview(expression) {
   if (!expression || !hasOperation(expression)) return null;
+  const key = `${state.degrees}|${expression}`;
+  if (previewCache.key === key) return previewCache.value;
+  let value;
   try {
-    return formatNumber(evaluate(expression));
+    value = formatNumber(evaluate(expression));
   } catch (error) {
-    return null;
+    value = null;
   }
+  previewCache = { key, value };
+  return value;
+}
+
+let previewFrame = null;
+
+function setSecondary(text) {
+  secondaryEl.textContent = text;
+  secondaryEl.classList.toggle("visible", text !== "");
+  secondaryEl.scrollLeft = secondaryEl.scrollWidth;
+}
+
+function updateOverflow() {
+  const maxLeft = primaryEl.scrollWidth - primaryEl.clientWidth;
+  const overflowing = maxLeft > 1;
+  const left = primaryEl.scrollLeft;
+  primaryWrap.classList.toggle("overflow-left", overflowing && left > 1);
+  primaryWrap.classList.toggle("overflow-right", overflowing && left < maxLeft - 1);
+  displayMeta.classList.toggle("visible", overflowing);
+  const text = primaryEl.textContent;
+  const digits = text === "0" ? 0 : (text.match(/\d/g) || []).length;
+  if (overflowing && digits > 0) {
+    metaCount.textContent = `${digits.toLocaleString("en-US")} ${digits === 1 ? "digit" : "digits"}`;
+    metaCount.hidden = false;
+  } else {
+    metaCount.hidden = true;
+  }
+}
+
+function scrollPrimary(toStart) {
+  primaryEl.scrollLeft = toStart ? 0 : primaryEl.scrollWidth;
+  updateOverflow();
 }
 
 function refresh() {
   primaryEl.classList.remove("error");
   primaryEl.textContent = state.expression === "" ? "0" : state.expression;
-  let secondaryText = "";
-  if (state.evaluated) {
-    secondaryText = `${state.history} =`;
-  } else {
-    const result = preview(state.expression);
-    secondaryText = result === null ? "" : `= ${result}`;
+  scrollPrimary(state.evaluated);
+  if (previewFrame) {
+    cancelAnimationFrame(previewFrame);
+    previewFrame = null;
   }
-  secondaryEl.textContent = secondaryText;
-  secondaryEl.classList.toggle("visible", secondaryText !== "");
-  scrollToEnd();
-}
-
-function scrollToEnd() {
-  primaryEl.scrollLeft = primaryEl.scrollWidth;
-  secondaryEl.scrollLeft = secondaryEl.scrollWidth;
+  if (state.evaluated) {
+    setSecondary(`${state.history} =`);
+    return;
+  }
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = null;
+    const result = preview(state.expression);
+    setSecondary(result === null ? "" : `= ${result}`);
+  });
 }
 
 function animate(name) {
@@ -385,6 +496,7 @@ function equals() {
     state.expression = "";
     state.history = "";
     state.evaluated = false;
+    updateOverflow();
     animate("shake");
   }
 }
@@ -460,7 +572,8 @@ function addToHistory(expression, result) {
   historyData.push({ expression, result });
   if (historyData.length > 40) historyData = historyData.slice(-40);
   saveHistory();
-  renderHistory();
+  historyPanel.classList.toggle("has-items", historyData.length > 0);
+  if (historyPanel.classList.contains("open")) renderHistory();
 }
 
 function renderHistory() {
@@ -562,7 +675,77 @@ themeToggle.addEventListener("click", toggleTheme);
 historyToggle.addEventListener("click", openHistory);
 historyClear.addEventListener("click", clearHistory);
 scrim.addEventListener("click", closeHistory);
-primaryEl.addEventListener("click", copyResult);
+let dragState = null;
+
+function onPrimaryPointerDown(event) {
+  if (event.button) return;
+  dragState = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startScroll: primaryEl.scrollLeft,
+    moved: false
+  };
+  try {
+    primaryEl.setPointerCapture(event.pointerId);
+  } catch (error) {}
+}
+
+function onPrimaryPointerMove(event) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+  const dx = event.clientX - dragState.startX;
+  if (!dragState.moved && Math.abs(dx) > 4) {
+    dragState.moved = true;
+    primaryEl.classList.add("grabbing");
+  }
+  if (dragState.moved) primaryEl.scrollLeft = dragState.startScroll - dx;
+}
+
+function onPrimaryPointerUp(event) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+  const dragged = dragState.moved;
+  try {
+    primaryEl.releasePointerCapture(dragState.pointerId);
+  } catch (error) {}
+  dragState = null;
+  primaryEl.classList.remove("grabbing");
+  if (!dragged) copyResult();
+}
+
+function jumpToEnd() {
+  const behavior = prefersReducedMotion ? "auto" : "smooth";
+  const atStart = primaryEl.scrollLeft <= 1;
+  primaryEl.scrollTo({ left: atStart ? primaryEl.scrollWidth : 0, behavior });
+}
+
+primaryEl.addEventListener("pointerdown", onPrimaryPointerDown);
+primaryEl.addEventListener("pointermove", onPrimaryPointerMove);
+primaryEl.addEventListener("pointerup", onPrimaryPointerUp);
+primaryEl.addEventListener("pointercancel", onPrimaryPointerUp);
+primaryEl.addEventListener("scroll", updateOverflow, { passive: true });
+
+primaryEl.addEventListener("wheel", (event) => {
+  if (primaryEl.scrollWidth - primaryEl.clientWidth <= 1) return;
+  event.preventDefault();
+  primaryEl.scrollLeft += event.deltaY + event.deltaX;
+}, { passive: false });
+
+primaryEl.addEventListener("keydown", (event) => {
+  const behavior = prefersReducedMotion ? "auto" : "smooth";
+  if (event.key === "Home") {
+    event.preventDefault();
+    primaryEl.scrollTo({ left: 0, behavior });
+  } else if (event.key === "End") {
+    event.preventDefault();
+    primaryEl.scrollTo({ left: primaryEl.scrollWidth, behavior });
+  } else if (event.key === "ArrowLeft") {
+    primaryEl.scrollLeft -= 48;
+  } else if (event.key === "ArrowRight") {
+    primaryEl.scrollLeft += 48;
+  }
+});
+
+metaCount.addEventListener("click", jumpToEnd);
+window.addEventListener("resize", updateOverflow);
 
 keysContainer.addEventListener("click", (event) => {
   const key = event.target.closest(".key");

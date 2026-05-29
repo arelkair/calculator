@@ -396,6 +396,81 @@ body {
 .display-primary::-webkit-scrollbar { display: none; }
 .display-primary.error { color: var(--error); }
 
+.primary-wrap { position: relative; }
+
+.primary-wrap.overflow-right .display-primary {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 46px);
+  mask-image: linear-gradient(to left, transparent 0, #000 46px);
+}
+
+.primary-wrap.overflow-left .display-primary {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 46px);
+  mask-image: linear-gradient(to right, transparent 0, #000 46px);
+}
+
+.primary-wrap.overflow-left.overflow-right .display-primary {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%);
+}
+
+.primary-wrap.overflow-left .display-primary,
+.primary-wrap.overflow-right .display-primary { cursor: grab; }
+
+.display-primary.grabbing { cursor: grabbing; }
+
+.display-primary:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.display-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: height 0.28s var(--ease), opacity 0.24s ease;
+}
+
+.display-meta.visible {
+  height: 22px;
+  opacity: 1;
+}
+
+.meta-hint {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.meta-count {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  padding: 3px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s var(--ease), filter 0.2s ease;
+}
+
+.meta-count:hover { filter: brightness(0.9); }
+.meta-count:active { transform: scale(0.93); }
+.meta-count[hidden] { display: none; }
+
 .display-primary.flash { animation: flash 0.3s var(--ease); }
 .display-primary.shake { animation: shake 0.4s var(--ease); }
 .display-primary.appear { animation: appear 0.18s var(--ease); }

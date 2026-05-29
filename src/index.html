@@ -58,7 +58,13 @@
   <main class="calculator" role="application" aria-label="Scientific calculator">
     <section class="display">
       <div class="display-secondary" id="secondary" aria-live="polite"></div>
-      <div class="display-primary" id="primary" role="button" tabindex="-1" aria-label="Result, tap to copy">0</div>
+      <div class="primary-wrap" id="primaryWrap">
+        <div class="display-primary" id="primary" role="button" tabindex="0" aria-label="Result, tap to copy, drag or scroll to explore long numbers">0</div>
+      </div>
+      <div class="display-meta" id="displayMeta">
+        <span class="meta-hint" aria-hidden="true">drag &middot; scroll</span>
+        <button class="meta-count" id="metaCount" type="button" aria-label="Jump to the other end of the number" hidden></button>
+      </div>
     </section>
 
     <div class="keys">
@@ -143,6 +149,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite">Copied</div>
 
+  <script src="js/vendor/decimal.min.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

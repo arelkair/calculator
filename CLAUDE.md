@@ -7,10 +7,12 @@ A modern, minimalist and responsive web calculator built with plain HTML, CSS an
 - `src/index.html` - Markup and key layout
 - `src/css/styles.css` - Theme tokens, layout and responsive styles
 - `src/js/main.js` - Calculator state and input logic
+- `src/js/vendor/decimal.min.js` - Vendored decimal.js, the arbitrary-precision engine
 
 ## Features
 
 - Expression engine with parentheses, precedence and unary minus (tokenizer, shunting-yard, RPN)
+- Hybrid numeric core: exact unbounded integers via native BigInt, arbitrary-precision decimals and irrationals via decimal.js
 - Scientific functions: trigonometry with inverse (2nd), logarithms, roots, powers, factorial, percentage
 - Constants pi and e, plus DEG/RAD toggle
 - Light and dark themes with a circular reveal transition (View Transitions API) and persistence
@@ -22,4 +24,4 @@ A modern, minimalist and responsive web calculator built with plain HTML, CSS an
 
 ## Run
 
-Open `src/index.html` in any browser. No build step or dependencies required.
+Open `src/index.html` in any browser. No build step required; decimal.js is vendored locally in `src/js/vendor/`, so no package manager or network access is needed.
